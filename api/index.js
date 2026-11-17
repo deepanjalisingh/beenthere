@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+  // Set CORS headers so your website can talk to this backend
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -15,13 +16,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Database credentials not configured in Vercel.' });
   }
 
-  const action = req.query.action || 'mentors';
-
   // Helper function to send email via Resend
   async function sendEmail({ to, subject, html, cc }) {
     if (!RESEND_API_KEY) {
       console.warn('RESEND_API_KEY not configured. Skipping email.');
-      return null;
+      return { error: 'RESEND_API_KEY is missing in Vercel environment variables.' };
     }
     try {
       const payload = {
@@ -45,12 +44,31 @@ export default async function handler(req, res) {
       return await res.json();
     } catch (err) {
       console.error('Email send failed:', err);
-      return null;
+      return { error: err.message };
     }
   }
 
+  // 1. Direct Instant Test Trigger (e.g. /api/index?test_email=your@email.com)
+  if (req.query.test_email) {
+    const testResult = await sendEmail({
+      to: req.query.test_email,
+      subject: 'Test Email from BEENTHERE',
+      html: `
+        <div style="font-family: sans-serif; color: #0f172a; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #047857;">Success!</h2>
+          <p>Your BEENTHERE Vercel backend and Resend email system are connected and working!</p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+          <p style="font-size: 12px; color: #64748b;">BEENTHERE Guidance Marketplace • “Talk to someone who’s been there.”</p>
+        </div>
+      `
+    });
+    return res.status(200).json({ status: 'test_triggered', testResult });
+  }
+
+  const action = req.query.action || 'mentors';
+
   try {
-    // 1. MENTORS ENDPOINT
+    // 2. MENTORS ENDPOINT
     if (action === 'mentors') {
       if (req.method === 'GET') {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/mentor_profiles?select=*`, {
@@ -108,7 +126,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. BOOKINGS ENDPOINT
+    // 3. BOOKINGS ENDPOINT
     if (action === 'bookings') {
       if (req.method === 'GET') {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=*`, {
@@ -180,4 +198,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
-
