@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Set CORS headers so your website can talk to this backend
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,24 +15,21 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Database credentials not configured in Vercel.' });
   }
 
-  // Helper function to send email via Resend
   async function sendEmail({ to, subject, html, cc }) {
     if (!RESEND_API_KEY) {
-      console.warn('RESEND_API_KEY not configured. Skipping email.');
-      return { error: 'RESEND_API_KEY is missing in Vercel environment variables.' };
+      console.warn('RESEND_API_KEY missing.');
+      return { error: 'RESEND_API_KEY missing' };
     }
     try {
       const payload = {
-        from: 'BEENTHERE <onboarding@resend.dev>', // Free testing sender domain
+        from: 'BEENTHERE <onboarding@resend.dev>',
         to: Array.isArray(to) ? to : [to],
         subject: subject,
         html: html
       };
-      if (cc && cc.length > 0) {
-        payload.cc = Array.isArray(cc) ? cc : [cc];
-      }
+      if (cc && cc.length > 0) payload.cc = Array.isArray(cc) ? cc : [cc];
 
-      const res = await fetch('https://api.resend.com/emails', {
+      const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -41,26 +37,18 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify(payload)
       });
-      return await res.json();
+      return await r.json();
     } catch (err) {
-      console.error('Email send failed:', err);
       return { error: err.message };
     }
   }
 
-  // 1. Direct Instant Test Trigger (e.g. /api/index?test_email=your@email.com)
+  // Instant direct test trigger: /api/index?test_email=your@email.com
   if (req.query.test_email) {
     const testResult = await sendEmail({
       to: req.query.test_email,
       subject: 'Test Email from BEENTHERE',
-      html: `
-        <div style="font-family: sans-serif; color: #0f172a; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <h2 style="color: #047857;">Success!</h2>
-          <p>Your BEENTHERE Vercel backend and Resend email system are connected and working!</p>
-          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
-          <p style="font-size: 12px; color: #64748b;">BEENTHERE Guidance Marketplace • “Talk to someone who’s been there.”</p>
-        </div>
-      `
+      html: '<h2>Success!</h2><p>Your BEENTHERE email system is working.</p>'
     });
     return res.status(200).json({ status: 'test_triggered', testResult });
   }
@@ -68,7 +56,7 @@ export default async function handler(req, res) {
   const action = req.query.action || 'mentors';
 
   try {
-    // 2. MENTORS ENDPOINT
+    // 1. MENTORS ENDPOINT
     if (action === 'mentors') {
       if (req.method === 'GET') {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/mentor_profiles?select=*`, {
@@ -103,30 +91,27 @@ export default async function handler(req, res) {
         });
         const result = await response.json();
 
-        // Send confirmation email to mentor applicant
-        if (newMentor.email) {
-          await sendEmail({
-            to: newMentor.email,
-            subject: 'Application Received — BEENTHERE Mentor Network',
-            html: `
-              <div style="font-family: sans-serif; color: #1e293b; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <h2 style="color: #0f172a;">Welcome to BEENTHERE</h2>
-                <p>Hello <strong>${newMentor.name}</strong>,</p>
-                <p>Thank you for applying to become a verified mentor on <strong>BEENTHERE</strong> (“Talk to someone who’s been there.”).</p>
-                <p>Your profile is currently under review with status: <strong style="color: #d97706;">PENDING APPROVAL</strong>.</p>
-                <p>Our team will vet your academic/career background. Once approved, your profile will appear live in the public mentor directory.</p>
-                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-                <p style="font-size: 12px; color: #64748b;">BEENTHERE Guidance Marketplace • Private & Verified Mentorship</p>
-              </div>
-            `
-          });
-        }
+        // Send mentor application confirmation to owner inbox
+        await sendEmail({
+          to: 'deepanjalisingh0999@gmail.com',
+          subject: `[BEENTHERE] New Mentor Application: ${newMentor.name}`,
+          html: `
+            <div style="font-family: sans-serif; color: #0f172a; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2>New Mentor Application Received</h2>
+              <p><strong>Name:</strong> ${newMentor.name}</p>
+              <p><strong>Email:</strong> ${newMentor.email}</p>
+              <p><strong>Institution / Company:</strong> ${newMentor.university_or_company}</p>
+              <p><strong>Status:</strong> <span style="color: #d97706; font-weight: bold;">PENDING APPROVAL</span></p>
+              <p>Please review and approve this application in your Admin Control Center.</p>
+            </div>
+          `
+        });
 
-        return res.status(201).json({ message: 'Mentor profile submitted and confirmation email sent.', data: result });
+        return res.status(201).json({ message: 'Mentor profile submitted for admin review.', data: result });
       }
     }
 
-    // 3. BOOKINGS ENDPOINT
+    // 2. BOOKINGS ENDPOINT
     if (action === 'bookings') {
       if (req.method === 'GET') {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=*`, {
@@ -162,34 +147,25 @@ export default async function handler(req, res) {
         });
         const result = await response.json();
 
-        // Send booking confirmation email to seeker (+ guardian if minor)
-        if (bookingData.seeker_email) {
-          const ccList = bookingData.is_minor && bookingData.guardian_email ? [bookingData.guardian_email] : [];
-          await sendEmail({
-            to: bookingData.seeker_email,
-            cc: ccList,
-            subject: `Session Requested with ${bookingData.mentor_name} — BEENTHERE`,
-            html: `
-              <div style="font-family: sans-serif; color: #1e293b; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <h2 style="color: #0f172a;">Session Booking Requested</h2>
-                <p>Hello <strong>${bookingData.seeker_name}</strong>,</p>
-                <p>Your session request has been submitted on <strong>BEENTHERE</strong>.</p>
-                <div style="background-color: #f8fafc; padding: 16px; border-radius: 6px; margin: 16px 0;">
-                  <p style="margin: 4px 0;"><strong>Mentor:</strong> ${bookingData.mentor_name}</p>
-                  <p style="margin: 4px 0;"><strong>Topic:</strong> ${bookingData.topic}</p>
-                  <p style="margin: 4px 0;"><strong>Format:</strong> ${bookingData.session_format}</p>
-                  <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: #2563eb;">Requested</span></p>
-                  ${bookingData.is_minor ? `<p style="margin: 4px 0; color: #047857;"><strong>Guardian Consent:</strong> Verified (${bookingData.guardian_name})</p>` : ''}
-                </div>
-                <p>You can track the session status anytime from your <strong>Seeker Hub</strong>.</p>
-                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-                <p style="font-size: 12px; color: #64748b;">Notice: Guidance is based on personal lived experience. BEENTHERE does not guarantee admission or job offers.</p>
-              </div>
-            `
-          });
-        }
+        // Deliver booking email notification directly to your owner inbox
+        await sendEmail({
+          to: 'deepanjalisingh0999@gmail.com',
+          subject: `[BEENTHERE] New Session Booking: ${bookingData.seeker_name} with ${bookingData.mentor_name}`,
+          html: `
+            <div style="font-family: sans-serif; color: #0f172a; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2>New Consultation Booked</h2>
+              <p><strong>Seeker:</strong> ${bookingData.seeker_name} (${bookingData.seeker_email})</p>
+              <p><strong>Mentor:</strong> ${bookingData.mentor_name}</p>
+              <p><strong>Topic:</strong> ${bookingData.topic}</p>
+              <p><strong>Format:</strong> ${bookingData.session_format}</p>
+              ${bookingData.is_minor ? `<p style="color: #047857;"><strong>Guardian Consent Verified:</strong> ${bookingData.guardian_name} (${bookingData.guardian_email})</p>` : ''}
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+              <p style="font-size: 12px; color: #64748b;">BEENTHERE Guidance Marketplace</p>
+            </div>
+          `
+        });
 
-        return res.status(201).json({ message: 'Booking requested and confirmation email sent.', data: result });
+        return res.status(201).json({ message: 'Session booking requested successfully.', data: result });
       }
     }
 
@@ -198,3 +174,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
