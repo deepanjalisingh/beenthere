@@ -1,0 +1,18 @@
+{
+  "name": "BEENTHERE — Guidance Marketplace",
+  "short_name": "BEENTHERE",
+  "description": "Talk to someone who's been there. Direct, confidential 1-on-1 mentorship for education and career decisions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%23090D16'/%3E%3Ccircle cx='256' cy='256' r='180' fill='%230F172A' stroke='%23C5A059' stroke-width='16'/%3E%3Cpolygon points='256,110 295,240 256,220 217,240' fill='%23C5A059'/%3E%3Cpolygon points='256,402 295,272 256,292 217,272' fill='%23E2E8F0'/%3E%3Ccircle cx='256' cy='256' r='24' fill='%23C5A059'/%3E%3C/svg%3E",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
